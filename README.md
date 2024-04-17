@@ -1,7 +1,17 @@
 # Fresh_Segments Case_Study
 <img width="544" alt="case study 1" src="https://github.com/RanjithKalakonda/Fresh_Segments_Case_Study/assets/167210784/2ad790e1-e607-46a4-9d50-3d74813ea6d1">
+  
+# 📚 Table of Contents
 
-## Business Task
+- [Business Task](#business-task)
+- [Fresh Segment Tables](#fresh-segment-tables)
+- [Data Exploration and Cleansing](#data-exploration-and-cleansing)
+- [Interest Analysis](#interest-analysis)
+- [Segment Analysis](#segment-analysis)
+- [Index Analysis](#index-analysis)
+- Please note that all the information regarding the case study has been sourced from the following link: [here](https://8weeksqlchallenge.com/case-study-8/)
+
+## 💼 Business Task
 Fresh Segments is a digital marketing agency that helps other businesses analyse trends in online ad click behaviour for their unique customer base.
 
 Clients share their customer lists with the Fresh Segments team who then aggregate interest metrics and generate a single dataset worth of metrics for further analysis.
@@ -10,7 +20,8 @@ In particular - the composition and rankings for different interests are provide
 
 Danny has asked for your assistance to analyse aggregated metrics for an example client and provide some high level insights about the customer list and their interests.
 
-## Entity Relationship Diagram
+## 📂 Fresh Segment Tables
+
 ### Table: interest_metrics
 - This table contains information about aggregated interest metrics for a specific major client of Fresh Segments which makes up a large proportion of their customer base.
   
@@ -44,7 +55,7 @@ Danny has asked for your assistance to analyse aggregated metrics for an example
 | 12 | Thrift Store Shoppers     | Consumers shopping online for clothing at thrift stores and researching locations. | 2016-05-26 14:57:59 | 2018-03-16 13:14:00 |
 | 13 | Advertising Professionals | People who read advertising industry news.                              | 2016-05-26 14:57:59 | 2018-05-23 11:30:12 |
 
-## Data Exploration and Cleansing
+## 🧼 Data Exploration and Cleansing
 ### 1. Update the fresh_segments.interest_metrics table by modifying the month_year column to be a date data type with the start of the month
 
 ```SQL
@@ -152,7 +163,7 @@ WHERE month_year < created_at;
 - So definitely there will always be records earlier than created_at, that is why we can assume that the raw data records in interest_metrics is not detailed enough.
 - Considering the dates are in the same month, hence we will consider the records as valid.
 
-## B. Interest Analysis
+## 📈 Interest Analysis
 ### 1. Which interests have been present in all month_year dates in our dataset?
   
   - First, how many month_year do we have? is there any gap month where no interest at all?
@@ -254,4 +265,217 @@ WHERE interest_id IN (
 ```
 ![Screenshot 2024-04-16 231905](https://github.com/RanjithKalakonda/Fresh_Segments_Case_Study/assets/167210784/de1b22d8-8706-44cd-be62-21478094e8df)
 
+### 5. If we include all of our interests regardless of their counts - how many unique interests are there for each month?
 
+```SQL
+SELECT
+    month_year, 
+    COUNT(DISTINCT interest_id) interest_per_month
+FROM interest_metrics
+GROUP BY month_year
+ORDER BY month_year DESC;
+```
+![Screenshot 2024-04-17 114122](https://github.com/RanjithKalakonda/Fresh_Segments_Case_Study/assets/167210784/7d6b7d98-48c4-4af7-9a9a-95adf87662f4)
+
+## 🔍 Key Findings and Insights :
+
+- Core Interests: A significant subset of interests, representing approximately 40% of all distinct interest IDs, remains consistently relevant to customers across all 14 month-year dates. These core interests play a pivotal role in driving customer engagement and should be prioritized in marketing strategies.
+
+- Dominant Influence: Interests with a total of 6 months or more collectively contribute to over 90% of the dataset's cumulative percentage. This highlights the dominance of a relatively small number of interests in capturing the majority of customer interactions, emphasizing their critical role in shaping marketing efforts.
+
+- Data Completeness and Variability: While certain interests demonstrate consistent presence, others exhibit variability with fewer than 14 months of data. This variability underscores the dynamic nature of customer preferences and highlights the importance of continuously monitoring and analyzing customer interactions to maintain data completeness and accuracy for informed decision-making.
+
+## 📈 Segment Analysis
+
+### 1. Using the complete dataset - which are the top 10 and bottom 10 interests which have the largest composition values in any month_year? Only use the maximum composition value for each interest but you must keep the corresponding month_year.
+
+```SQL
+WITH int_rank_cte AS
+(SELECT month_year, 
+		interest_name,
+        composition,
+        RANK() OVER(PARTITION BY interest_name 
+					  ORDER BY composition DESC) AS int_rank
+FROM interest_metrics AS metrics
+JOIN interest_map AS map 
+ON map.id = metrics.interest_id
+WHERE month_year IS NOT NULL
+),
+ top_10_cte AS 
+(SELECT month_year, 
+		interest_name,
+        composition
+ FROM int_rank_cte
+ WHERE int_rank = 1
+ ORDER BY composition DESC
+ LIMIT 10
+ ),
+  bottom_10_cte AS
+(SELECT month_year, 
+		interest_name,
+        composition
+ FROM int_rank_cte
+ WHERE int_rank = 1
+ ORDER BY composition 
+ LIMIT 10
+ ),
+  Final_Output AS
+(SELECT * FROM top_10_cte
+ UNION
+SELECT * FROM bottom_10_cte
+)
+SELECT * FROM Final_Output
+ORDER BY composition DESC;
+```
+![image](https://github.com/RanjithKalakonda/Fresh_Segments_Case_Study/assets/167210784/0c9a5f2b-105a-4156-98fb-38705938a72e)
+
+### 2. Which 5 interests had the lowest average ranking value?
+
+```SQL
+SELECT interest_name,
+		ROUND(AVG(ranking), 1) AS avg_ranking,
+        COUNT(*) AS records_count
+FROM interest_metrics AS metrics
+JOIN interest_map AS map
+	ON map.id = metrics.interest_id
+WHERE month_year IS NOT NULL
+GROUP BY interest_name
+ORDER BY avg_ranking;
+```
+![image](https://github.com/RanjithKalakonda/Fresh_Segments_Case_Study/assets/167210784/fda9c47e-a688-4386-b2ab-ac78a15f23fe)
+
+### 3. Which 5 interests had the largest standard deviation in their percentile_ranking value?
+
+```SQL
+SELECT interest_name, 
+		ROUND(STDDEV(CAST(percentile_ranking AS DECIMAL)), 2) AS strd_ranking,
+        MAX(percentile_ranking) AS max_ranking,
+        MIN(percentile_ranking) AS min_ranking,
+        COUNT(*) AS records_count
+FROM interest_metrics AS metrics
+JOIN interest_map AS map
+	ON map.id = metrics.interest_id
+WHERE month_year IS NOT NULL
+GROUP BY interest_name
+ORDER BY strd_ranking DESC
+LIMIT 5;
+```
+![image](https://github.com/RanjithKalakonda/Fresh_Segments_Case_Study/assets/167210784/52232ac7-80f6-4ef3-b429-63e34da8784a)
+
+### 4. For the 5 interests found in the previous question - what was minimum and maximum percentile_ranking values for each interest and its corresponding year_month value? Can you describe what is happening for these 5 interests?
+
+```SQL
+SELECT interest_id, 
+		interest_name,
+		month_year,
+		percentile_ranking,
+		MAX(percentile_ranking) AS max_ranking,
+		MIN(percentile_ranking) AS min_ranking
+FROM interest_metrics AS metrics
+JOIN interest_map AS map
+	ON map.id = metrics.interest_id
+WHERE month_year IS NOT NULL
+		AND interest_id IN (6260, 23, 131, 150, 38992)
+GROUP BY interest_id, 
+		interest_name,
+		month_year,
+		percentile_ranking
+ORDER BY  interest_name,
+		  month_year;
+```
+
+![image](https://github.com/RanjithKalakonda/Fresh_Segments_Case_Study/assets/167210784/1e735662-f952-4810-b7ef-d716df77f1d9)
+
+- We can observe with the output that the interest dropped significantly during early period vs the end period
+
+## 🔍 Key Findings and Insights :
+
+- Based on the data, our customers exhibit diverse interests, with some showing strong engagement and others less so. We should prioritize products or services aligned with highly engaged interests like "Work Comes First Travelers" and "Gym Equipment Owners." Conversely, niche interests with lower engagement, such as "World of Warcraft Enthusiasts," may not warrant significant investment. Overall, focusing on high-engagement interests will likely yield better results.
+
+## 🚀 Recommendations:
+
+- For customers showing high composition and ranking values, we should focus on showcasing products or services directly related to their interests, as they are likely to be more receptive. Tailored marketing campaigns, personalized recommendations, and exclusive offers can help enhance their engagement further. However, for customers with lower composition and ranking values, we may need to employ strategies to pique their interest, such as offering discounts, introducing new features, or providing educational content to encourage interaction. It's essential to avoid overwhelming them with irrelevant content and instead focus on gradually nurturing their interest to build a stronger connection with our brand.
+
+## 📈 Index Analysis
+
+### 1. What is the top 10 interests by the average composition for each month?
+
+```SQL
+SELECT interest_name, 
+		month_year,
+        composition/index_value AS ind_comp,
+		DENSE_RANK() OVER(PARTITION BY month_year
+						ORDER BY(composition/index_value)DESC
+                        ) AS ind_rank
+FROM interest_metrics AS metrics
+JOIN interest_map AS map
+	ON map.id = metrics.interest_id
+WHERE month_year IS NOT NULL
+ORDER BY month_year;
+```
+![image](https://github.com/RanjithKalakonda/Fresh_Segments_Case_Study/assets/167210784/612cc575-0b4f-4c9a-8058-46a17d94301e)
+
+### 2. For all of these top 10 interests - which interest appears the most often?
+
+```SQL
+WITH cte_index AS (
+  SELECT month_year,
+			interest_name,
+			composition / index_value AS index_composition, 
+    DENSE_RANK() OVER (
+      PARTITION BY month_year
+      ORDER BY (composition / index_value) DESC
+    ) AS index_rank
+  FROM interest_metrics AS metrics
+JOIN interest_map AS map
+	ON map.id = metrics.interest_id
+WHERE month_year IS NOT NULL
+)
+SELECT interest_name, count(*) as Count_records
+FROM cte_index
+WHERE index_rank <= 10 
+group by interest_name
+order by Count_records desc
+limit 3;
+```
+![image](https://github.com/RanjithKalakonda/Fresh_Segments_Case_Study/assets/167210784/8ddc35b4-73be-46e5-8dc9-be3250f60989)
+
+### 3. What is the average of the average composition for the top 10 interests for each month?
+
+```SQL
+WITH cte_index AS (
+  SELECT month_year,
+			interest_name,
+			composition / index_value AS index_composition, 
+    DENSE_RANK() OVER (
+      PARTITION BY month_year
+      ORDER BY (composition / index_value) DESC
+    ) AS index_rank
+  FROM interest_metrics AS metrics
+JOIN interest_map AS map
+	ON map.id = metrics.interest_id
+WHERE month_year IS NOT NULL
+)
+SELECT month_year, round(avg(index_composition), 1) as avg_composition
+FROM cte_index
+WHERE index_rank <= 10 
+group by month_year
+order by month_year DESC;
+```
+
+![image](https://github.com/RanjithKalakonda/Fresh_Segments_Case_Study/assets/167210784/5a3dafa6-7fe3-488c-98f3-c3ed84d81684)
+
+## 🔍 Key Findings and Insights :
+
+- The maximum average composition can change from month to month due to several factors. Firstly, seasonal trends and holidays may influence consumer behavior, leading to fluctuations in interest and engagement levels with certain products or services. Additionally, marketing campaigns, promotions, or events targeted at specific interests can impact their popularity and composition values within a given period. Changes in market dynamics, such as shifts in competition, emerging trends, or economic factors, may also influence consumer preferences and affect the composition of interests. Furthermore, variations in product availability, quality, or pricing may attract or deter customers, thereby impacting the average composition. Overall, the dynamic nature of consumer behavior and market conditions contributes to the variability in the maximum average composition over time.
+
+
+## 🚀 Recommendations:
+ - The fluctuation in the maximum average composition from month to month could potentially signal underlying issues with the overall business model for Fresh Segments. If there are significant and consistent decreases in the maximum average composition over time, it might indicate challenges in attracting and retaining customers within key interest segments. This could be attributed to various factors such as ineffective marketing strategies, poor product offerings, increasing competition, or declining customer satisfaction. Additionally, a sharp decline in the maximum average composition could suggest a loss of relevance or appeal in the market, highlighting the need for strategic adjustments to the business model to address changing consumer preferences and market dynamics. Therefore, while fluctuations in composition values are natural, consistent downward trends may warrant further analysis and corrective action to ensure the long-term success and sustainability of Fresh Segments' business model.
+
+### 📌 NOTE:
+**The data underscores the importance of prioritizing core interests and highly engaged segments in marketing strategies. However, further analysis is needed to fully understand customer behaviors and preferences. Exploring potential patterns among customer interests could offer insights into expanding market reach and enhancing customer satisfaction.**
+
+# 📋 Conclusion:
+
+- In conclusion, the analysis underscores the importance of prioritizing core interests and high-engagement segments in marketing strategies. While certain interests consistently drive customer engagement, others exhibit variability, emphasizing the need for continuous monitoring and adaptation. Recommendations include tailoring marketing efforts to customer interests, avoiding irrelevant content, and addressing potential issues with the business model to ensure long-term success and relevance.
